@@ -1,7 +1,6 @@
 import bge
 import common
 import mathutils
-import saver
 
 TILE = 'Tile'
 PIECE = 'Pieces'
@@ -56,8 +55,6 @@ def move_piece_to_tile(piece, tile_obj):
         up = tile_obj.worldOrientation * normal  # Rotate normal by tile objects orientation
         piece.alignAxisToVect(up, 2, 1)
     piece.setParent(tile_obj)
-    if 'TILE' in piece:
-        saver.register_move(piece['TILE'], tile_obj)
     piece['TILE'] = tile_obj
     
 def get_tile(obj):

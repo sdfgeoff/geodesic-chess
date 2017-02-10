@@ -31,9 +31,33 @@ def get_current_player():
 def set_current_player(player):
     bge.logic.globalDict['CURRENT_PLAYER'] = player
     
-def toggle_current_plyer():
+def toggle_current_player():
     '''Switches who's turn it is'''
     set_current_player(1 - get_current_player())
+
+def skip_turn(cont):
+    '''Skips the players turn'''
+    # Two sensors here, so we need to AND them
+    for sens in cont.sensors:  
+        if not sens.positive:
+            return
+    toggle_current_player()
+    saver.set_player(get_current_player())
+    
+    
+def undo_turn(cont):
+    '''Undoes the most recent turn'''
+    # Two sensors here, so we need to AND them
+    for sens in cont.sensors:  
+        if not sens.positive:
+            return
+    last_move = saver.get_last_move()
+    if last_move is not None:
+        piece = tiles.get_piece_on_tile(last_move['to'])
+        pieces.move_piece_to_tile(piece, last_move['from'])
+        saver.remove_last_move()
+        toggle_current_player()
+        
 
 
 def clicked(cont):
@@ -112,8 +136,11 @@ def do_click(hit_obj):
                 
             # Move the active piece to the clicked on tile,
             # switch the player and deselect all pieces.
+            old_tile = pieces.get_tile(pieces.active_piece())
             pieces.move_piece_to_tile(pieces.active_piece(), hit_tile)
-            toggle_current_plyer()
+            saver.register_move(old_tile, hit_tile, get_current_player())
+            toggle_current_player()
+            saver.set_player(get_current_player())
             pieces.select_piece(None)
             
     elif pieces.get_player(hit_piece) == get_current_player():

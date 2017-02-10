@@ -12,3 +12,10 @@ def is_a(obj, tile):
         return True
     except RuntimeError:
         return False
+        
+def get_scene(scene_name):
+    sce = [s for s in bge.logic.getSceneList() if s.name == scene_name]
+    if sce:
+        return sce[0]
+    else:
+        return None
