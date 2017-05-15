@@ -6,6 +6,10 @@ import bge
 import config
 import saver
 
+import camera
+import environment
+import inputs
+
 import common
 import pieces
 import tiles
@@ -16,21 +20,47 @@ bge.render.showMouse(True)
 
 def init(cont):
     '''Set up the game (load a blank board)'''
+    bge.logic.globalDict['GAME'] = Game(cont.owner.scene)
+    cont.script = __name__ + '.run'
+
+    # ------------------------------ DEPRECATED ------------------------------
     pieces.init(cont)
     tiles.init(cont)
     saver.load_empty(cont.owner.scene)
     set_current_player(0)
 
-    cont.script = __name__ + '.run'
+
+
+
+class Game(object):
+    '''This object contains everything else, and administers interactions
+    between them'''
+    def __init__(self, scene):
+        self.scene = scene
+        self.camera = camera.Camera(scene.objects['CameraCenter'])
+        self.environment = environment.Environment(scene.objects['EnvironmentBackdrop'])
+        self.mouse = inputs.Mouse()
+
+    def update(self):
+        self.mouse.update()
+        self.camera.update(self.mouse.drag_delta)
+        self.environment.update()
+
+
+
+
+
+
+
 
 
 def get_current_player():
     '''Returns who's turn it currently is'''
     return bge.logic.globalDict['CURRENT_PLAYER']
-    
+
 def set_current_player(player):
     bge.logic.globalDict['CURRENT_PLAYER'] = player
-    
+
 def toggle_current_player():
     '''Switches who's turn it is'''
     set_current_player(1 - get_current_player())
@@ -38,17 +68,17 @@ def toggle_current_player():
 def skip_turn(cont):
     '''Skips the players turn'''
     # Two sensors here, so we need to AND them
-    for sens in cont.sensors:  
+    for sens in cont.sensors:
         if not sens.positive:
             return
     toggle_current_player()
     saver.set_player(get_current_player())
-    
-    
+
+
 def undo_turn(cont):
     '''Undoes the most recent turn'''
     # Two sensors here, so we need to AND them
-    for sens in cont.sensors:  
+    for sens in cont.sensors:
         if not sens.positive:
             return
     last_move = saver.get_last_move()
@@ -57,11 +87,12 @@ def undo_turn(cont):
         pieces.move_piece_to_tile(piece, last_move['from'])
         saver.remove_last_move()
         toggle_current_player()
-        
+
+
 
 
 def clicked(cont):
-    '''Returns True if the mouse has been clicked, but not if it is 
+    '''Returns True if the mouse has been clicked, but not if it is
     dragged'''
     click_status = bge.logic.mouse.events[bge.events.LEFTMOUSE]
     pos = bge.logic.mouse.position
@@ -80,16 +111,19 @@ def dragging(cont):
 
 def run(cont):
     '''The users interface with the game'''
+    bge.logic.globalDict['GAME'].update()
+
+    # ------------------------------ DEPRECATED ------------------------------
     #Indicator of current player
     HUD = [s for s in bge.logic.getSceneList() if s.name == 'HUD'][0]
     indicator = [o for o in HUD.objects if 'TURNINDICATOR' in o][0]
     indicator.color = [0,get_current_player(),0,0]
-    
+
     # Get the object the mouse is over by casting a ray from the camera:
     cam = cont.owner.scene.active_camera
     pos = bge.logic.mouse.position
     hit_obj = cam.getScreenRay(pos[0], pos[1], 100)
-    
+
     # Highlight the tile the mouse is over. This should be expanded in
     # future to show what moves are legitimate.
     if not dragging(cont) and common.is_a(hit_obj, pieces.TILE):
@@ -104,7 +138,7 @@ def run(cont):
 
 def do_click(hit_obj):
     '''Calculates what piece to move where based on the mouse clicks'''
-    # Normalize the input, so there is always a tile and piece and 
+    # Normalize the input, so there is always a tile and piece and
     # the player. This greatly simplifies the code later on
     if common.is_a(hit_obj, common.PIECE):
         hit_piece = hit_obj
@@ -114,12 +148,12 @@ def do_click(hit_obj):
         hit_piece = tiles.get_piece_on_tile(hit_obj)
         hit_tile = hit_obj
         hit_player = pieces.get_player(hit_piece)
-        
+
     else:
         # If no piece is hit, then select nothing
         pieces.select_piece(None)
         return
-        
+
     if pieces.active_piece() is not None:
         if pieces.active_piece() == hit_piece:
             # If you click on the already selected piece, deselect it
@@ -133,7 +167,7 @@ def do_click(hit_obj):
                 # moving to, and it isn't one of yours (dealt with
                 # above), then delete it.
                 hit_piece.endObject()
-                
+
             # Move the active piece to the clicked on tile,
             # switch the player and deselect all pieces.
             old_tile = pieces.get_tile(pieces.active_piece())
@@ -142,7 +176,7 @@ def do_click(hit_obj):
             toggle_current_player()
             saver.set_player(get_current_player())
             pieces.select_piece(None)
-            
+
     elif pieces.get_player(hit_piece) == get_current_player():
         # If you click on one of your own pieces, select it
         pieces.select_piece(hit_piece)
