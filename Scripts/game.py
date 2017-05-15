@@ -37,10 +37,11 @@ class Game(object):
         self.camera = camera.Camera(scene.objects['CameraCenter'])
         self.environment = environment.Environment(scene.objects['EnvironmentBackdrop'])
 
-        # Create the mouse helper
+        # Create the mouse helper and link it to the game scene
         self.mouse = inputs.Mouse()
         self.mouse.scenes.append(self.scene)
 
+        # Load an empty board
         self.board = board.Board(self.scene)
         self.board.load(open(config.BLANK_GAME))
 

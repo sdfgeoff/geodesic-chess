@@ -37,18 +37,7 @@ class Piece(bge.types.KX_GameObject):
     @tile.setter
     def tile(self, tile_obj):
         '''Teleports a piece from one tile to another'''
-        self.worldPosition = tile_obj.worldPosition
-        if ALIGN_TO_FACE_NORMAL:
-            # Align the tile to the direction of tile (using a random vertex
-            # The tiles need to be flat for this to be correct)
-            mesh = tile_obj.meshes[0]
-            vertex = mesh.getVertex(0, 0)
-            local_dir = vertex.normal  # Vertex's normal direction
-            # Correct for tile world rotation
-            world_dir = tile_obj.worldOrientation * local_dir
-            self.alignAxisToVect(world_dir, 2, 1)
-        else:
-            self.worldOrientation = tile_obj.worldOrientation
+        align_two_objects(tile_obj, self)
         self.setParent(tile_obj)
 
         # Handle all the relationships
@@ -100,3 +89,19 @@ def add_piece(scene, tile, piece, player, piece_id):
     new_piece = Piece(new_obj, player, piece_id)
     new_piece.tile = tile
     return new_piece
+
+
+def align_two_objects(tile_obj, piece_obj):
+    '''Makes one object copy the location and orientation of the other'''
+    piece_obj.worldPosition = tile_obj.worldPosition
+    if ALIGN_TO_FACE_NORMAL:
+        # Align the tile to the direction of tile (using a random vertex
+        # The tiles need to be flat for this to be correct)
+        mesh = tile_obj.meshes[0]
+        vertex = mesh.getVertex(0, 0)
+        local_dir = vertex.normal  # Vertex's normal direction
+        # Correct for tile world rotation
+        world_dir = tile_obj.worldOrientation * local_dir
+        piece_obj.alignAxisToVect(world_dir, 2, 1)
+    else:
+        piece_obj.worldOrientation = tile_obj.worldOrientation
