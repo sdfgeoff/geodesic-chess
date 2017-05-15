@@ -12,8 +12,8 @@ class Tile(bge.types.KX_GameObject):
     '''This inherits all the functions from KX_GameObject, and just
     adds a few of it's own'''
     def __init__(self, _game_obj, id_num):
-        self._highlight = False
-        self.highlight = False
+        self._highlighted = False
+        self.highlighted = False
 
         self.id = id_num
 
@@ -34,14 +34,14 @@ class Tile(bge.types.KX_GameObject):
             piece.move_to_tile(self)
 
     @property
-    def highlight(self):
+    def highlighted(self):
         '''If the tile is currently highlighted'''
         return self._highlight
 
-    @highlight.setter
-    def highlight(self, val):
+    @highlighted.setter
+    def highlighted(self, val):
         '''If the passed in variable is True, highlight the tile'''
-        self._highlight = val
+        self._highlighted = val
         if val:
             self.color = TILE_SELECT_COLOR
         else:

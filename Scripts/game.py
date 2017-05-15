@@ -13,6 +13,8 @@ import tiles
 import board
 import config
 
+import possible_moves
+
 bge.render.showMouse(True)
 
 
@@ -45,7 +47,6 @@ class Game(object):
         self._current_player = 0
         self.current_player = 0
 
-        self._selected_piece = None
         self.selected_piece = None
 
     def update(self):
@@ -57,25 +58,66 @@ class Game(object):
 
         hit_obj = self.mouse.get_over(self.scene)
 
-        if not self.mouse.did_click:
-            return
-
-        # Normalize so you always have a tile and piece
         if isinstance(hit_obj, pieces.Piece):
-            self.do_move(
-                hit_obj,        # Piece
-                hit_obj.tile    # Tile
-            )
+            hit_piece = hit_obj
+            hit_tile = hit_obj.tile
         elif isinstance(hit_obj, tiles.Tile):
-            self.do_move(
-                hit_obj.piece,  # Piece
-                hit_obj         # Tile
-            )
+            hit_piece = hit_obj.piece
+            hit_tile = hit_obj
         else:
-            self.selected_piece = None
+            hit_piece = None
+            hit_tile = None
+
+        if self.mouse.did_click:
+            self.do_move(hit_piece, hit_tile)
+        else:
+            self.do_highlight(hit_piece, hit_tile)
+
+        # The HUD should be a seperate object, but I haven't done that yet,
+        # so for now we twiddle the indicator here
+        hud_scene = [s for s in bge.logic.getSceneList() if s.name == 'HUD']
+        if hud_scene:
+            indicator = hud_scene[0].objects['PlayerIndicator']
+            indicator.color[pieces.CHANNEL_PLAYER] = self.current_player
+            indicator.color[pieces.CHANNEL_SELECT] = pieces.PIECE_DESELECT_COLOR
+
+    def do_highlight(self, hit_piece, hit_tile):
+        '''Highlights the various pieces and tiles'''
+        # Highlight the selected piece, unhighlight everything else
+        for piece in self.board.pieces:
+            if piece is self.selected_piece:
+                piece.highlighted = True
+            else:
+                piece.highlighted = False
+
+        # Unhighlight all tiles
+        for tile_name in self.board.tiles:
+            tile = self.board.tiles[tile_name]
+            tile.highlighted = False
+
+        # Highlight the items the mouse is over
+        if hit_piece:
+            hit_piece.highlighted = True
+        if hit_tile:
+            hit_tile.highlighted = True
+
+        # Highlight places the selected piece can move
+        if self.selected_piece is not None:
+            for tile_name in possible_moves.get_possible_moves(
+                    self.selected_piece.name,
+                    self.selected_piece.tile.name
+                    ):
+                tile = self.board.tiles[tile_name]
+                tile.highlighted = True
+
+
 
     def do_move(self, hit_piece, hit_tile):
         '''The maze of logic to deal with moving pieces'''
+        if hit_piece is None and hit_tile is None:
+            self.selected_piece = None
+            return
+
         hit_player = None if hit_piece is None else hit_piece.player
         if self.selected_piece is not None:
             if self.selected_piece == hit_piece:
@@ -91,6 +133,7 @@ class Game(object):
                     # above), then delete it.
                     hit_piece.end()
                     self.board.pieces.remove(hit_piece)
+                    self.selected_piece.tile = hit_tile
                     self.selected_piece = None
 
                 # Move the active piece to the clicked on tile,
@@ -120,18 +163,6 @@ class Game(object):
         self._current_player = val
         if config.AUTO_FLIP_GAME:
             self.board.direction = bool(self.current_player)
-
-    @property
-    def selected_piece(self):
-        '''The currenly selected piece'''
-        return self._selected_piece
-
-    @selected_piece.setter
-    def selected_piece(self, val):
-        '''Unhighlight all pieces except for the one you have just selected'''
-        self._selected_piece = val
-        for piece in self.board.pieces:
-            piece.highlighted = piece is val
 
 
 def skip_turn(cont):
