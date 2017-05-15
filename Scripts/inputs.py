@@ -1,6 +1,7 @@
 import bge
 import mathutils
 
+
 class Mouse(object):
     '''Contains some functions to check if the mouse has moved and by how
     much'''
@@ -17,8 +18,18 @@ class Mouse(object):
         self._prev_pos = None              # Position in the last frame
         self._click_start_position = None  # Where the click started
 
+        # Cache what the mouse is over because it is computationally
+        # expensive so we should only run it once
+        self._over_cache = dict()
+        self.scenes = list()
+
     def update(self):
         '''Update the status of the mouse'''
+        self._update_clicking()
+        self._update_over()
+
+    def _update_clicking(self):
+        '''Updates the information on the mouses click status'''
         click_status = bge.logic.mouse.events[bge.events.LEFTMOUSE]
         mouse_position = mathutils.Vector(bge.logic.mouse.position)
 
@@ -31,6 +42,10 @@ class Mouse(object):
             self.drag_delta = self._prev_pos - mouse_position
             self._prev_pos = mouse_position
 
+            # Stop accidental modification when you read values
+            self.drag_delta.freeze()
+            self.drag_vector.freeze()
+
         elif click_status == bge.logic.KX_INPUT_JUST_RELEASED:
             # If the mouse hasn't moved too far since it was clicked, then
             # register this as a click:
@@ -40,3 +55,14 @@ class Mouse(object):
             self.did_click = False
             self.drag_delta = None
             self.drag_vector = None
+
+    def _update_over(self):
+        '''Updates what object the mouse is "over" in the cache'''
+        for scene in self.scenes:
+            cam = scene.active_camera
+            pos = bge.logic.mouse.position
+            self._over_cache[scene.name] = cam.getScreenRay(pos[0], pos[1], 100)
+
+    def get_over(self, scene):
+        '''Returns the object the mouse is over - in the specific scene'''
+        return self._over_cache[scene.name]

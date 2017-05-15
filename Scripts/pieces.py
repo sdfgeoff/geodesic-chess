@@ -1,80 +1,102 @@
 import bge
-import common
-import mathutils
 
-TILE = 'Tile'
-PIECE = 'Pieces'
-
+# We need to display two attributes for each piece: if it is selected
+# and what player it belongs to.
+# To do this there is a clever shader on the piece. The red channel (channel 0)
+# indicates it's selection and the blue channel (channel 1) indicates which
+# player
 PIECE_SELECT_COLOR = 1
 PIECE_DESELECT_COLOR = 0
 
 CHANNEL_SELECT = 0
 CHANNEL_PLAYER = 1
 
-ALIGN_TO_FACE_NORMAL = True  # Aligns to face normal of a random vertex in the hit object
-
-def init(cont):
-    bge.logic.globalDict['ACTIVE_PIECE'] = None
-
-    for obj in cont.owner.scene.objects:
-        if common.is_a(obj, common.PIECE):
-            deselect_piece(obj)
+# Aligns to face normal of a random vertex in the hit object or to the object's
+# rotation
+ALIGN_TO_FACE_NORMAL = True
 
 
-def active_piece():
-    '''Returns the currenly selected piece'''
-    return bge.logic.globalDict['ACTIVE_PIECE']
+class Piece(bge.types.KX_GameObject):
+    def __init__(self, _old_obj, player, piece_id):
+        # Set who owns the piece
+        self._player = player
+        self.player = player
+
+        # Set the initial state of being unselected
+        self._highlighted = False
+        self.highlighted = False
+        self.id = piece_id
+
+        self._tile = None
+
+    @property
+    def tile(self):
+        '''The tile the piece is on'''
+        return self._tile
+
+    @tile.setter
+    def tile(self, tile_obj):
+        '''Teleports a piece from one tile to another'''
+        self.worldPosition = tile_obj.worldPosition
+        if ALIGN_TO_FACE_NORMAL:
+            # Align the tile to the direction of tile (using a random vertex
+            # The tiles need to be flat for this to be correct)
+            mesh = tile_obj.meshes[0]
+            vertex = mesh.getVertex(0, 0)
+            local_dir = vertex.normal  # Vertex's normal direction
+            # Correct for tile world rotation
+            world_dir = tile_obj.worldOrientation * local_dir
+            self.alignAxisToVect(world_dir, 2, 1)
+        else:
+            self.worldOrientation = tile_obj.worldOrientation
+        self.setParent(tile_obj)
+
+        # Handle all the relationships
+        if self.tile is not None:
+            self.tile.piece = None  # Invalidate previous relationship
+        self._tile = tile_obj       # Store current tile
+        self.tile.piece = self      # Store current piece
+
+    @property
+    def highlighted(self):
+        '''If the piece is currently highlighted'''
+        return self._highlighted
+
+    @highlighted.setter
+    def highlighted(self, val):
+        '''If the passed in variable is True, highlight the tile'''
+        self._highlighted = val
+        if val:
+            self.color[CHANNEL_SELECT] = PIECE_SELECT_COLOR
+        else:
+            self.color[CHANNEL_SELECT] = PIECE_DESELECT_COLOR
+
+    @property
+    def player(self):
+        '''What player the piece is associated with'''
+        return self._player
+
+    @player.setter
+    def player(self, val):
+        '''If the passed in variable is True, highlight the tile'''
+        self._player = val
+        self.color[CHANNEL_PLAYER] = val
+
+    def __repr__(self):
+        '''How this piece displays when you print it'''
+        return "Piece: {}, Player: {}, ID: {}".format(
+            self.name, self.player, self.id
+        )
+
+    def end(self):
+        '''Removes all references to this object and removes it (hopefully)'''
+        self.tile.piece = None
+        self.endObject()
 
 
-def deselect_piece(obj):
-    '''Deselects the tile'''
-    if obj is not None:
-        col = obj.color
-        col[CHANNEL_SELECT] = PIECE_DESELECT_COLOR
-        obj.color = col
-    if bge.logic.globalDict['ACTIVE_TILE'] == obj:
-        bge.logic.globalDict['ACTIVE_TILE'] = None
-
-def select_piece(obj):
-    '''selects the supplied tile - deselecting everything else'''
-    deselect_piece(bge.logic.globalDict['ACTIVE_PIECE'])
-    if obj is not None:
-        col = obj.color
-        col[CHANNEL_SELECT] = PIECE_SELECT_COLOR
-        obj.color = col
-    bge.logic.globalDict['ACTIVE_PIECE'] = obj
-
-def move_piece_to_tile(piece, tile_obj):
-    '''Teleports a piece from one tile to another'''
-    piece.worldPosition = tile_obj.worldPosition
-    if ALIGN_TO_FACE_NORMAL:
-        # Align the tile to the direction of tile (using a random vertex - I hope the tiles are flat)
-        mesh = tile_obj.meshes[0]
-        vertex = mesh.getVertex(0, 0)
-        normal = vertex.normal  # Vertex's normal direction
-        up = tile_obj.worldOrientation * normal  # Rotate normal by tile objects orientation
-        piece.alignAxisToVect(up, 2, 1)
-    piece.setParent(tile_obj)
-    piece['TILE'] = tile_obj
-    
-def get_tile(obj):
-    '''Returns the tile associated with a piece'''
-    if obj is not None:
-        return obj['TILE']
-        
-def get_player(piece):
-    '''Returns the player associated with a piece'''
-    if piece is not None:
-        return piece['PLAYER']
-
-def add_piece(scene, tile, piece, player):
+def add_piece(scene, tile, piece, player, piece_id):
     '''Creates a new piece'''
-    tile_obj = scene.objects[tile]
-    new_obj = scene.addObject(piece, tile_obj)
-    move_piece_to_tile(new_obj, tile_obj)
-    deselect_piece(new_obj)
-    new_obj['PLAYER'] = player
-    
-    col = new_obj.color
-    col[CHANNEL_PLAYER] = player
-    new_obj.color = col
+    new_obj = scene.addObject(piece, tile)
+    new_piece = Piece(new_obj, player, piece_id)
+    new_piece.tile = tile
+    return new_piece

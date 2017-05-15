@@ -1,40 +1,54 @@
-import bge
+try:
+    import bge
+except ImportError:
+    from fake_api import bge
 
-import common
 
 TILE_SELECT_COLOR = [1, 1, 1, 1]
 TILE_DESELECT_COLOR = [0, 0, 0, 0]
 
-def init(cont):
-    '''Sets up the files (deselects them all)'''
-    bge.logic.globalDict['ACTIVE_TILE'] = None
 
-    for obj in cont.owner.scene.objects:
-        if common.is_a(obj, common.TILE):
-            deselect_tile(obj)
-            
+class Tile(bge.types.KX_GameObject):
+    '''This inherits all the functions from KX_GameObject, and just
+    adds a few of it's own'''
+    def __init__(self, _game_obj, id_num):
+        self._highlight = False
+        self.highlight = False
 
-def active_tile():
-    '''Returns the currently selected tile'''
-    return bge.logic.globalDict['ACTIVE_TILE']
+        self.id = id_num
 
-def deselect_tile(obj):
-    '''Deselects the tile'''
-    if obj is not None:
-        obj.color = TILE_DESELECT_COLOR
-    if bge.logic.globalDict['ACTIVE_TILE'] == obj:
-        bge.logic.globalDict['ACTIVE_TILE'] = None
+        # Variables with an underscore are private and should not be
+        # accessed by code outside the class
+        self._piece = None
 
-def select_tile(obj):
-    '''selects the supplied tile - deselecting everything else'''
-    deselect_tile(bge.logic.globalDict['ACTIVE_TILE'])
-    if obj is not None:
-        obj.color = TILE_SELECT_COLOR
-    bge.logic.globalDict['ACTIVE_TILE'] = obj
+    @property
+    def piece(self):
+        '''Returns the piece that is currently on this tile'''
+        return self._piece
 
+    @piece.setter
+    def piece(self, piece):
+        '''Sets what piece is on this tile'''
+        self._piece = piece
+        if piece is not None and piece.tile is not self:
+            piece.move_to_tile(self)
 
-def get_piece_on_tile(obj):
-	'''Returns the piece on a tile or None'''
-	for child in obj.children:
-		if common.is_a(child, common.PIECE):
-			return child
+    @property
+    def highlight(self):
+        '''If the tile is currently highlighted'''
+        return self._highlight
+
+    @highlight.setter
+    def highlight(self, val):
+        '''If the passed in variable is True, highlight the tile'''
+        self._highlight = val
+        if val:
+            self.color = TILE_SELECT_COLOR
+        else:
+            self.color = TILE_DESELECT_COLOR
+
+    def __repr__(self):
+        '''How this tile displays when you print it'''
+        return "Tile: {}, ID: {}".format(
+            self.name, self.id
+        )
